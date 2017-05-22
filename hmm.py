@@ -1,73 +1,68 @@
-# coding=gbk
+# coding=utf-8
 """
 hmm.py
 ~~~~~~~~~~~~~~~~
-Ê¹ÓÃÂí¶û¿Æ·òÁ´ÍÚ¾òÊı¾İ
-ÊäÈë£ºref ĞĞÎªÄ£Ê½¿â
-      s   ´ı²âĞòÁĞ
-Êä³ö£º
-´ı²âĞòÁĞÊÇ·ñÎªÕı³£ÓÃ»§ĞĞÎªĞòÁĞ
-¿ÉÄÜµÄÌáÊ¾´íÎó£ºĞĞÎªÄ£Ê½¿âÊıÁ¿²»×ãÊ±¿ÉÄÜ»áÓĞÒì³£
+ä½¿ç”¨é©¬å°”ç§‘å¤«é“¾æŒ–æ˜æ•°æ®
+è¾“å…¥ï¼šref è¡Œä¸ºæ¨¡å¼åº“
+      s   å¾…æµ‹åºåˆ—
+è¾“å‡ºï¼š
+å¾…æµ‹åºåˆ—æ˜¯å¦ä¸ºæ­£å¸¸ç”¨æˆ·è¡Œä¸ºåºåˆ—
+å¯èƒ½çš„æç¤ºé”™è¯¯ï¼šè¡Œä¸ºæ¨¡å¼åº“æ•°é‡ä¸è¶³æ—¶å¯èƒ½ä¼šæœ‰å¼‚å¸¸
 """
 import pymysql
 import math
 import sys
+import numpy
+import os
+import time
+ITEMNUM = 30000
+ITEMLEN = 5
+TV = 0.5  # çŸ­åºåˆ—åŒ¹é…é˜ˆå€¼
 
-ITEMNUM = 1285
-ITEMLEN = 4
-SEQUENCELEN = 4  # ¶ÌĞòÁĞ³¤¶È
-TV = 0.5  # ¶ÌĞòÁĞÆ¥ÅäãĞÖµ
+# viterbiç®—æ³•
+# æ±‚ä»¥ç‰¹å®šçŠ¶æ€så¼€å§‹çš„é•¿åº¦ä¸ºTçš„æå¤§ä¼¼ç„¶çŠ¶æ€çŸ­åºåˆ—
+def getConnection():
+    conn = pymysql.connect(host='localhost', db='supervision', user='root', passwd='root', port=3306,
+                           charset='utf8')  # ä¹‹åå¯ä»¥æ”¾åˆ°é…ç½®æ–‡ä»¶ä¸­è¯»å–
+    return conn
 
-# viterbiËã·¨
-# ÇóÒÔÌØ¶¨×´Ì¬s¿ªÊ¼µÄ³¤¶ÈÎªTµÄ¼«´óËÆÈ»×´Ì¬¶ÌĞòÁĞ
 
-def viterbi(A, N, s, pi):
-    str = [0] * SEQUENCELEN
+def viterbi(A, N, s, pi, len):
+    str = [0] * len
     str[0] = s
-    delta = [[0 for i in range(N)] for i in range(SEQUENCELEN)]
-    psi = [[0 for i in range(N)] for i in range(SEQUENCELEN)]
-    i = 0
-    while i < N:
+    delta = [[0 for i in range(N)] for i in range(len)]
+    psi = [[0 for i in range(N)] for i in range(len)]
+    for i in range(0,N):
         delta[1][i] = pi[i] + A[s][i]
         psi[1][i] = s
-        i += 1
-
-        t = 2
-    while t < SEQUENCELEN:
-        j = 0
-        while j < N:
+    for t in range(2,len):
+        for j in range(0,N):
             minval = delta[t - 1][0] + (A[0][j])
             minvalind = 0
-            i = 1
-            while i < N:
+            for i in range(1,N):
                 val = delta[t - 1][i] + (A[i][j])
                 if val > minval:
                     minval = val;
                     minvalind = i;
-                i += 1
             delta[t][j] = minval;
             psi[t][j] = minvalind;
-            j += 1
-        t += 1
-    pprob = delta[SEQUENCELEN - 1][0]
-    str[SEQUENCELEN - 1] = 0
-    i = 1
-    while i < N:
-        if delta[SEQUENCELEN - 1][i] > pprob:
-            pprob = delta[SEQUENCELEN - 1][i]
-            str[SEQUENCELEN - 1] = i
-        i += 1
-    t = SEQUENCELEN - 2
+    pprob = delta[len - 1][0]
+    str[len - 1] = 0
+    for i in range(1,N):
+        if delta[len - 1][i] > pprob:
+            pprob = delta[len - 1][i]
+            str[len - 1] = i
+    t = len - 2
     while t >= 1:
         str[t] = psi[t + 1][str[t + 1]]
         t -= 1
     return str;
 
 
-# Testacc º¯Êı
-# ²âÊÔÓÃ
-# ¼ÙÉèĞòÁĞsÓë¶ÌĞòÁĞ³¤¶ÈÏàÍ¬£¬·µ»ØÏàËÆ³Ì¶È
-def Testacc(s, sequences, A, pi):
+# Testacc å‡½æ•°
+# æµ‹è¯•ç”¨
+# å‡è®¾åºåˆ—sä¸çŸ­åºåˆ—é•¿åº¦ç›¸åŒï¼Œè¿”å›ç›¸ä¼¼ç¨‹åº¦
+def Testacc(s, sequences, A, pi, len):
     for index in range(len(s)):
         i = 0
         while i < len(sequences):
@@ -77,7 +72,7 @@ def Testacc(s, sequences, A, pi):
             i += 1
         if i == len(sequences):
             s[index] = len(sequences) - 1
-    v = viterbi(A, len(sequences), s[0], pi)
+    v = viterbi(A, len(sequences), s[0], pi, len)
     acc = 0.0
     for i in range(len(s)):
         if s[i] == v[i]:
@@ -85,13 +80,13 @@ def Testacc(s, sequences, A, pi):
     return acc / len(s)
 
 
-# Testº¯Êı
-# #ÓÃMarkovÑµÁ·Ä£¿éµÃµ½µÄÕı³£ÌØÕ÷¿âÖĞ¶ÌĞòÁĞµÄ³¤¶ÈTÎª»¬¶¯´°¿Ú,
-# ÒÀ´Î´Ó´ı²â×´Ì¬ĞòÁĞÖĞ½ØÈ¡³¤¶ÈÎªTµÄ¶ÌĞòÁĞ;
-# È»ºóÓëÕı³£ÌØÕ÷¿âÖĞ¾ßÓĞÏàÍ¬Ê××´Ì¬µÄÌØÕ÷¶ÌĞòÁĞÏà±È½Ï¡£
-# ÈôÁ½Õß²»ÏàÍ¬µÄ×´Ì¬Êı´óÓÚÒ»¶¨µÄãĞÖµV(VÊÇ½éÓÚ1¡« TµÄÕûÊı,
-# ¿É³ÆÖ®Îª¶ÌĞòÁĞÆ¥ÅäãĞÖµ),ÔòÈÏÎª´Ë´Î½ØÈ¡µÄ¶ÌĞòÁĞ²»Õı³£;
-# ÈôÁ½Õß²»ÏàÍ¬µÄ×´Ì¬ÊıĞ¡ÓÚµÈÓÚãĞÖµV,ÔòÈÏÎª´Ë´Î½ØÈ¡µÄ¶ÌĞòÁĞÕı³£¡£
+# Testå‡½æ•°
+# ä»¥1åˆ°Tä¸ºæ»‘åŠ¨çª—å£,
+# ä¾æ¬¡ä»å¾…æµ‹çŠ¶æ€åºåˆ—ä¸­æˆªå–ä»æ»‘åŠ¨çª—å£å¼€å§‹åˆ°ç»“å°¾çš„çŸ­åºåˆ—;
+# ç„¶åä¸æ­£å¸¸ç‰¹å¾åº“ä¸­å…·æœ‰ç›¸åŒé¦–çŠ¶æ€çš„ç‰¹å¾çŸ­åºåˆ—ç›¸æ¯”è¾ƒã€‚
+# è‹¥ä¸¤è€…ä¸ç›¸åŒçš„çŠ¶æ€æ•°å¤§äºä¸€å®šçš„é˜ˆå€¼V(Væ˜¯ä»‹äº1ï½ Tçš„æ•´æ•°,
+# å¯ç§°ä¹‹ä¸ºçŸ­åºåˆ—åŒ¹é…é˜ˆå€¼),åˆ™è®¤ä¸ºæ­¤æ¬¡æˆªå–çš„çŸ­åºåˆ—ä¸æ­£å¸¸;
+# è‹¥ä¸¤è€…ä¸ç›¸åŒçš„çŠ¶æ€æ•°å°äºç­‰äºé˜ˆå€¼V,åˆ™è®¤ä¸ºæ­¤æ¬¡æˆªå–çš„çŸ­åºåˆ—æ­£å¸¸ã€‚
 def Test(s, sequences, A, pi):
     for index in range(len(s)):
         i = 0
@@ -103,44 +98,47 @@ def Test(s, sequences, A, pi):
         if i == len(sequences):
             s[index] = len(sequences) - 1
     sup = 0.0
-    for i in range(len(s) - 3):
-        v = viterbi(A, len(sequences), s[0], pi)
+    for i in range(len(s) - 1):
+        slen = len(s) - i
+        v = viterbi(A, len(sequences), s[i], pi, slen)
         acc = 0.0
-        for j in range(SEQUENCELEN):
+        for j in range(1, slen):
             if s[i + j] == v[j]:
                 acc += 1
-        if (acc / SEQUENCELEN) > TV:
+        if (acc / (slen - 1)) >= TV:
             sup += 1
-    return sup / (len(s) - SEQUENCELEN + 1)
+    return sup / (len(s) - 1)
 
 
-def readref():
+def readref(target):
     ref = []
-    try:
-        conn = pymysql.connect(host='localhost', user='root', passwd='root', port=3306, charset='utf8')
-        cur = conn.cursor()
-        cur.execute("USE genet")
-        cur.execute("SELECT * FROM seq2;")
-        res = cur.fetchall()
-        for row in res:
-            temp = [0] * ITEMLEN
-            for index in range(len(row) - 1):
-                temp[index] = row[index + 1]
-            ref += [temp]
-        cur.close()
-        conn.commit()
-        conn.close()
-        return ref
-    except  Exception:
-        print("error")
+    conn = getConnection()
+    cur = conn.cursor()
+    sql = "SELECT * FROM "
+    sql += target
+    cur.execute(sql)
+    res = cur.fetchall()
+    global ITEMNUM
+    ITEMNUM = len(res)
+    global ITEMLEN
+    ITEMLEN = len(res[0]) - 1
+    for row in res:
+        temp = [0] * ITEMLEN
+        for index in range(len(row) - 1):
+            temp[index] = row[index + 1]
+        ref += [temp]
+    cur.close()
+    conn.commit()
+    conn.close()
+    return ref
 
 
-# preprocessº¯Êı£º
-# ½«ÏµÍ³ĞĞÎª°´³öÏÖµÄ¸ÅÂÊ´ÓĞ¡µ½´ó½øĞĞÅÅĞò
-# ¼ÆËãÊ¹¡ÆP(i)¡İ 0.9³ÉÁ¢µÄ×îĞ¡ÕıÕûÊıN
-# ½«±àºÅÎª1¡« N -1µÄĞĞÎª×÷ÎªÒ»¸ö×´Ì¬,½«Ê£ÓàµÄÆäËûĞĞÎª(¼´º±ÓÃĞĞÎª)ºÏ²¢ÎªÂíÊÏÁ´µÄÒ»¸ö×´Ì¬
-# ¿ÉÒÔ·ÅÔÚÊı¾İ¿âÖĞ£¬ÓÃViewÍê³É¸Ã²Ù×÷
-def preprocess(items, sequences):
+# preprocesså‡½æ•°ï¼š
+# å°†ç³»ç»Ÿè¡Œä¸ºæŒ‰å‡ºç°çš„æ¦‚ç‡ä»å°åˆ°å¤§è¿›è¡Œæ’åº
+# è®¡ç®—ä½¿âˆ‘P(i)â‰¥ 0.9æˆç«‹çš„æœ€å°æ­£æ•´æ•°N
+# å°†ç¼–å·ä¸º1ï½ N -1çš„è¡Œä¸ºä½œä¸ºä¸€ä¸ªçŠ¶æ€,å°†å‰©ä½™çš„å…¶ä»–è¡Œä¸º(å³ç½•ç”¨è¡Œä¸º)åˆå¹¶ä¸ºé©¬æ°é“¾çš„ä¸€ä¸ªçŠ¶æ€
+# å¯ä»¥æ”¾åœ¨æ•°æ®åº“ä¸­ï¼Œç”¨Viewå®Œæˆè¯¥æ“ä½œ
+def preprocess(items, sequences, reverse):
     itemmap = {}
     total = 0
     for item in items:
@@ -153,78 +151,108 @@ def preprocess(items, sequences):
     itemmap = sorted(itemmap.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)
     totalprecent = 0.0
     major = 0
-    while totalprecent <= 0.9 and major < len(itemmap):
+    while major < len(itemmap):
         sequences += [(itemmap[major][0], itemmap[major][1] / total)]
         totalprecent += itemmap[major][1] / total
         major += 1
-    if major < len(itemmap):
-        minorpercent = 0
-        minor = len(itemmap) - 1
-        while minor >= major:
-            k = 0
-            while k < ITEMNUM:
-                m = 0
-                while m < ITEMLEN:
-                    if items[k][m] == itemmap[minor][0]:
-                        items[k][m] = -1
-                    m += 1
-                k += 1
-            minor -= 1
-            minorpercent += itemmap[minor][1] / total
-        sequences += [(-1, minorpercent)]
+    minorpercent = 1.0 / sys.maxint
+    sequences += [(-1, minorpercent)]
+    ###åŠ å…¥ç¨€æœ‰çŠ¶æ€###
+    # while totalprecent <= 0.99 and major < len(itemmap):
+    #     sequences += [(itemmap[major][0], itemmap[major][1] / total)]
+    #     totalprecent += itemmap[major][1] / total
+    #     major += 1
+    # minorpercent = 1.0 / sys.maxint
+    # if major < len(itemmap):
+    #     minor = len(itemmap) - 1
+    #     while minor >= major:
+    #         # k = 0
+    #         # while k < ITEMNUM:
+    #         #     m = 0
+    #         #     while m < ITEMLEN:
+    #         #         if items[k][m] == itemmap[minor][0]:
+    #         #             items[k][m] = -1
+    #         #         m += 1
+    #         #     k += 1
+    #         minor -= 1
+    #         minorpercent += itemmap[minor][1] / total
+    # sequences += [(-1, minorpercent)]
+    ### ###
+    for i in range(len(sequences)):
+        reverse[sequences[i][0]] = i
 
 
-# B:¸¨ÖúĞòÁĞ ÎªÁË»ñµÃ×´Ì¬×ªÒÆ¾ØÕóA
-def getB(sequences):
+# B:è¾…åŠ©åºåˆ— ä¸ºäº†è·å¾—çŠ¶æ€è½¬ç§»çŸ©é˜µA
+def getB(sequences, ref):
     B = [0] * len(sequences)
-    i = 0
-    while i < len(sequences):
-        k = 0
-        while k < ITEMNUM:
-            m = 0
-            while m < ITEMLEN - 1:
+    for k in range(ITEMNUM):
+        for m in range(ITEMLEN - 1):
+            for i in range(len(sequences) - 1):  # å»æ‰æœ€åçš„-1
                 if sequences[i][0] == ref[k][m]:
                     B[i] += 1
-                m += 1
-            k += 1
-        i += 1
+                    break
+                if i == len(sequences) - 2:  # ä¸ºç¨€æœ‰æƒ…å†µ
+                    B[len(sequences) - 1] += 1
     return B
 
 
-def getA(sequences):
-    A = [[0 for i in range(len(sequences))] for i in range(len(sequences))]
-    B = getB(sequences)
-    i = 0
-    while i < len(sequences):
-        j = 0
-        while j < len(sequences):
-            k = 0
-            while k < ITEMNUM:
-                m = 0
-                while m < ITEMLEN - 1:
-                    if sequences[i][0] == ref[k][m]:
-                        if sequences[j][0] == ref[k][m + 1]:
-                            A[i][j] += 1
-                    m += 1
-                k += 1
-            j += 1
-        i += 1
-    i = 0
-    while i < len(sequences):
-        j = 0
-        while j < len(sequences):
-            if A[i][j] != 0 and B[i] != 0:
-                k = (float)(A[i][j]) / B[i]
-                A[i][j] = math.log(k)
-            else:
-                A[i][j] = -sys.maxint
-            j += 1
-        i += 1
+def getA(sequences, ref, target):
+    if os.path.exists(target + 'A.csv'):
+        A = numpy.loadtxt(open(target + "A.csv", "rb"), delimiter=",", skiprows=0)
+    else:
+        A = [[0 for i in range(len(sequences))] for i in range(len(sequences))]
+        B = getB(sequences, ref)
+        for k in range(ITEMNUM):
+            for m in range(ITEMLEN - 1):
+                for i in range(len(sequences)):
+                    for j in range(len(sequences) - 1):  # å»æ‰æœ€åçš„-1
+                        if i == len(sequences) - 1:  # ä¸ºç¨€æœ‰æƒ…å†µ
+                            if sequences[j][0] == ref[k][m + 1]:
+                                A[len(sequences) - 1][j] += 1
+                                break
+                            elif j == len(sequences) - 2:  # ä¸ºç¨€æœ‰æƒ…å†µ
+                                A[len(sequences) - 1][len(sequences)-1] += 1
+                                break
+                        elif sequences[i][0] == ref[k][m]:
+                            if sequences[j][0] == ref[k][m + 1]:
+                                A[i][j] += 1
+                                break
+                            elif j == len(sequences) - 2:  # ä¸ºç¨€æœ‰æƒ…å†µ
+                                A[i][len(sequences) - 1] += 1
+                                break
+
+
+        # i = 0
+        # while i < len(sequences):
+        #     j = 0
+        #     while j < len(sequences):
+        #         k = 0
+        #         while k < ITEMNUM:
+        #             m = 0
+        #             while m < ITEMLEN - 1:
+        #                 if sequences[i][0] == ref[k][m]:
+        #                     if sequences[j][0] == ref[k][m + 1]:
+        #                         A[i][j] += 1
+        #                 m += 1
+        #             k += 1
+        #         j += 1
+        #     i += 1
+        for i in range(len(sequences)):
+            for j in range(len(sequences)):
+                if A[i][j] != 0 and B[i] != 0:
+                    k = (float)(A[i][j]) / B[i]
+                    A[i][j] = math.log(k)
+                else:
+                    A[i][j] = -sys.maxint
     return A
 
 
+def saveA(A, target):
+    numpy.savetxt(target + 'A.csv', A, delimiter=',')
+
+
 # getpi:
-# »ñµÃ³õÊ¼×´Ì¬pi
+# è·å¾—åˆå§‹çŠ¶æ€pi
 def getpi(sequences):
     pi = []
     for seq in sequences:
@@ -232,14 +260,119 @@ def getpi(sequences):
     return pi
 
 
-if __name__ == '__main__':
-    ref = readref()
+def getviterbibyname(target, s):
+    conn = getConnection()
+    cur = conn.cursor()
+    ref = readref(target)
     sequences = []
-    preprocess(ref, sequences)
-    A = getA(sequences)
-    pi=getpi(sequences)
-    v = viterbi(A, len(sequences), 0, pi)
+    reverse = {}
+    preprocess(ref, sequences, reverse)
+    ###å¤„ç†s###
+    sql = "SELECT `id` FROM "
+    sql += target + "_codes"
+    sql += " where `name`= '%s'" % (s)
+    cur.execute(sql)
+    res = cur.fetchall()
+    s = reverse[res[0][0]]
+    ######
+    # print sequences
+    A = getA(sequences, ref, target)
+    saveA(A, target)
+    # for a in A:
+    #     print a
+    pi = getpi(sequences)
+    v = viterbi(A, len(sequences), s, pi, 5)
+    for i in range(len(v)):
+        if sequences[v[i]][0] != -1:
+            sql = "SELECT `name` FROM "
+            sql += target + "_codes"
+            sql += " where `id`= '%s'" % (sequences[v[i]][0])
+            cur.execute(sql)
+            res = cur.fetchall()
+            v[i] = res[0][0]
+        else:
+            v[i] = unicode('ç¨€æœ‰çŠ¶æ€', 'utf-8')
+    return v
+
+
+def getviterbi(target, s):
+    conn = getConnection()
+    cur = conn.cursor()
+    ref = readref(target)
+    sequences = []
+    reverse = {}
+    preprocess(ref, sequences, reverse)
+    v = []
+    A = getA(sequences, ref, target)
+    saveA(A, target)
+    pi = getpi(sequences)
+    for si in s:
+        si = reverse[si]
+        vi = viterbi(A, len(sequences), si, pi, 5)
+        for i in range(len(vi)):
+            if sequences[vi[i]][0] != -1:
+                sql = "SELECT `name` FROM "
+                sql += target + "_codes"
+                sql += " where `id`= '%s'" % (sequences[vi[i]][0])
+                cur.execute(sql)
+                res = cur.fetchall()
+                vi[i] = res[0][0]
+            else:
+                vi[i] = unicode('ç¨€æœ‰çŠ¶æ€', 'utf-8')
+        v += [vi]
+    return v
+
+
+def getsimilaritybynumber(target, s):
+    ref = readref(target)
+    sequences = []
+    reverse = {}
+    preprocess(ref, sequences, reverse)
+    # print sequences
+    A = getA(sequences, ref, target)
+    saveA(A, target)
+    # for a in A:
+    #     print a
+    pi = getpi(sequences)
+    return Test(s, sequences, A, pi)
+
+
+def getsimilaritybyname(target, s):
+    conn = getConnection()
+    cur = conn.cursor()
+    for i in range(len(s)):
+        sql = "SELECT `id` FROM "
+        sql += target + "_codes"
+        sql += " where `name`= '%s'" % (s[i])
+        cur.execute(sql)
+        res = cur.fetchall()
+        s[i] = res[0][0]
+    cur.close()
+    conn.commit()
+    conn.close()
+    return getsimilaritybynumber(target, s)
+
+
+if __name__ == '__main__':
+    target = "warning_information"
+    # v = getviterbi(target, [1, 2, 3, 4])
+    # for v1 in v:
+    #     for v11 in v1:
+    #         print v11.encode('gbk')
+    #     print "_______"
+    #target="data_process_fileinfo_type"
+
+    start = time.clock()
+    ref = readref(target)
+    sequences = []
+    reverse = {}
+    preprocess(ref, sequences, reverse)
+    v = []
+    A = getA(sequences, ref, target)
+    end = time.clock()
+    print str(end - start) + "s"
+    v = getviterbi(target, [1,2,3,4])
     for v1 in v:
-        print sequences[v1][0]
-    s = [4, 5, 26, 1]
-    print Test(s, sequences, A, pi)
+        for v11 in v1:
+            print v11.encode('gbk')
+        print "_______"
